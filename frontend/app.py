@@ -6,6 +6,7 @@ import datetime
 from keycloak import KeycloakOpenID
 from streamlit_cookies_manager import CookieManager
 
+BACKEND_URL = "http://127.0.0.1:8000/upload"
 
 # Keycloak settings
 KEYCLOAK_SERVER_URL = "http://localhost:8080"
