@@ -14,8 +14,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Backend API URL
-BACKEND_URL = "http://localhost:8000/upload"
 
 # Keycloak settings
 KEYCLOAK_SERVER_URL = os.getenv("KEYCLOAK_SERVER_URL")
