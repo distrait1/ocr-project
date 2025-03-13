@@ -1,14 +1,10 @@
 import streamlit as st
+import requests
 from PIL import Image
 import io
 import datetime
 from keycloak import KeycloakOpenID
 from streamlit_cookies_manager import CookieManager
-import pytesseract
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, regexp_replace
-from kafka import KafkaProducer
-import json
 import os
 from dotenv import load_dotenv
 
@@ -22,37 +18,13 @@ KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID")
 KEYCLOAK_CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET") 
 SESSION_EXPIRY_HOURS = int(os.getenv("SESSION_EXPIRY_HOURS", 3)) 
 
-
 # Initialize Keycloak client
 keycloak_openid = KeycloakOpenID(server_url=KEYCLOAK_SERVER_URL,
-                                 client_id=KEYCLOAK_CLIENT_ID,
-                                 realm_name=KEYCLOAK_REALM,
-                                 client_secret_key=KEYCLOAK_CLIENT_SECRET)
+                                client_id=KEYCLOAK_CLIENT_ID,
+                                realm_name=KEYCLOAK_REALM,
+                                client_secret_key=KEYCLOAK_CLIENT_SECRET)
 
 cookies = CookieManager()
-
-# Initialize Spark Session
-spark = SparkSession.builder.appName("OCRProcessor").getOrCreate()
-
-# Initialize Kafka Producer
-producer = KafkaProducer(
-    bootstrap_servers="localhost:9092",
-    value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-)
-
-def process_text_with_spark(text):
-    """Processes the OCR text using PySpark."""
-    data = [(text,)]
-    df = spark.createDataFrame(data, ["raw_text"])
-
-    # Example: Remove non-alphanumeric characters and extra spaces
-    df = df.withColumn("cleaned_text", regexp_replace(col("raw_text"), "[^\\w\\s]+", ""))
-    df = df.withColumn("cleaned_text", regexp_replace(col("cleaned_text"), "\\s+", " "))
-
-    # Extract the cleaned text
-    cleaned_text = df.select("cleaned_text").collect()[0]["cleaned_text"]
-    
-    return cleaned_text
 
 def authenticate_user(username, password):
     try:
@@ -61,7 +33,7 @@ def authenticate_user(username, password):
         st.error("Incorrect email or password.")
         return None, False
     roles = set(keycloak_openid.decode_token(token['access_token'])["resource_access"]
-                    .get(KEYCLOAK_CLIENT_ID, {}).get("roles", []))
+                .get(KEYCLOAK_CLIENT_ID, {}).get("roles", []))
     if "access-tesseract" not in roles:
         return token, False
     return token, True
@@ -120,17 +92,19 @@ else:
         st.image(image, caption="Uploaded Image", use_container_width=True)
 
         if st.button("Extract Text"):
-            # Read the uploaded image
-            image = Image.open(uploaded_file)
+            # Send the image to the backend
+            files = {"file": uploaded_file.getvalue()}
             
-            # Extract text using Tesseract
-            text = pytesseract.image_to_string(image)
+            # Add the token to the request headers
+            access_token = st.session_state["token"]["access_token"]
+            headers = {"Authorization": f"Bearer {access_token}"}
             
-            # Process text using Spark
-            processed_text = process_text_with_spark(text)
+            response = requests.post(BACKEND_URL, files=files, headers=headers)
             
-            producer.send("ocr-text", {"text": processed_text})
-            
-            st.text_area("Extracted Text", processed_text, height=200)
+            if response.status_code == 200:
+                text = response.json()["text"]
+                st.text_area("Extracted Text", text, height=200)
+            else:
+                st.error(f"Failed to extract text. Status code: {response.status_code}")
     
     st.write("User authenticated and active session.")
