@@ -5,16 +5,20 @@ import io
 import datetime
 from keycloak import KeycloakOpenID
 from streamlit_cookies_manager import CookieManager
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Backend API URL
 BACKEND_URL = "http://localhost:8000/upload"
 
 # Keycloak settings
-KEYCLOAK_SERVER_URL = "http://localhost:8080"
-KEYCLOAK_REALM = "master"
-KEYCLOAK_CLIENT_ID = "streamlit-tesseract"
-KEYCLOAK_CLIENT_SECRET = "8omnaAGeHcrJtw3g0SZOygY7AHcfuzF2"
-SESSION_EXPIRY_HOURS = 3
+KEYCLOAK_SERVER_URL = os.getenv("KEYCLOAK_SERVER_URL")
+KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM") 
+KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID")
+KEYCLOAK_CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET") 
+SESSION_EXPIRY_HOURS = int(os.getenv("SESSION_EXPIRY_HOURS", 3)) 
 
 # Initialize Keycloak client
 keycloak_openid = KeycloakOpenID(server_url=KEYCLOAK_SERVER_URL,
