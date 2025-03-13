@@ -4,11 +4,19 @@ from PIL import Image
 import io
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, regexp_replace
+from kafka import KafkaProducer
+import json
 
 app = FastAPI()
 
 # Initialize Spark Session
 spark = SparkSession.builder.appName("OCRProcessor").getOrCreate()
+
+# Initialize Kafka Producer
+producer = KafkaProducer(
+    bootstrap_servers="localhost:9092",
+    value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+)
 
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
@@ -20,6 +28,8 @@ async def upload_image(file: UploadFile = File(...)):
     
     # Process text using Spark
     processed_text = process_text_with_spark(text)
+    
+    producer.send("ocr-text", {"text": processed_text})
     
     return {"text": processed_text}
 
